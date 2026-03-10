@@ -1,301 +1,88 @@
-# 🗣️ Python Nlp Sentiment Analysis
+# NLP Sentiment Analysis Pipeline
 
-> Data Science project - python-nlp-sentiment-analysis
+<div align="center">
 
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB.svg)](https://img.shields.io/badge/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://img.shields.io/badge/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://img.shields.io/badge/)
-[![NumPy](https://img.shields.io/badge/NumPy-1.26-013243.svg)](https://img.shields.io/badge/)
-[![Pandas](https://img.shields.io/badge/Pandas-2.2-150458.svg)](https://img.shields.io/badge/)
-[![Plotly](https://img.shields.io/badge/Plotly-5.18-3F4F75.svg)](https://img.shields.io/badge/)
-[![scikit--learn](https://img.shields.io/badge/scikit--learn-1.4-F7931E.svg)](https://img.shields.io/badge/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.31-FF4B4B.svg)](https://img.shields.io/badge/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![NLP](https://img.shields.io/badge/NLP-FF6F00?style=for-the-badge&logo=bookstack&logoColor=white)
 
-[English](#english) | [Português](#português)
+</div>
+
+**[English](#english)** | **[Portugues (BR)](#portugues-br)**
 
 ---
 
 ## English
 
-### 🎯 Overview
+### Overview
 
-**Python Nlp Sentiment Analysis** is a production-grade Python application that showcases modern software engineering practices including clean architecture, comprehensive testing, containerized deployment, and CI/CD readiness.
+A complete sentiment analysis pipeline implementing lexicon-based analysis (VADER-inspired), Naive Bayes classification, TF-IDF feature extraction, text preprocessing, and evaluation metrics. Built from scratch in Python without heavy dependencies.
 
-The codebase comprises **423 lines** of source code organized across **2 modules**, following industry best practices for maintainability, scalability, and code quality.
-
-### ✨ Key Features
-
-- **🗣️ Text Processing**: Tokenization, stemming, and lemmatization
-- **📊 Sentiment Analysis**: Multi-language sentiment classification
-- **🔍 Named Entity Recognition**: Entity extraction and classification
-- **📈 Text Analytics**: TF-IDF, word embeddings, and topic modeling
-- **⚡ Async API**: High-performance async REST API with FastAPI
-- **📖 Auto-Documentation**: Interactive Swagger UI and ReDoc
-- **✅ Validation**: Pydantic-powered request/response validation
-- **🐳 Containerized**: Docker support for consistent deployment
-
-### 🏗️ Architecture
+### Architecture
 
 ```mermaid
-graph TB
-    subgraph Client["🖥️ Client Layer"]
-        A[REST API Client]
-        B[Swagger UI]
-    end
-    
-    subgraph API["⚡ API Layer"]
-        C[Authentication & Rate Limiting]
-        D[Request Validation]
-        E[API Endpoints]
-    end
-    
-    subgraph ML["🤖 ML Engine"]
-        F[Feature Engineering]
-        G[Model Training]
-        H[Prediction Service]
-        I[Model Registry]
-    end
-    
-    subgraph Data["💾 Data Layer"]
-        J[(Database)]
-        K[Cache Layer]
-        L[Data Pipeline]
-    end
-    
-    A --> C
-    B --> C
-    C --> D --> E
-    E --> H
-    E --> J
-    H --> F --> G
-    G --> I
-    I --> H
-    E --> K
-    L --> J
-    
-    style Client fill:#e1f5fe
-    style API fill:#f3e5f5
-    style ML fill:#e8f5e9
-    style Data fill:#fff3e0
+graph TD
+    A[Raw Text] --> B[Text Preprocessor]
+    B --> C{Analysis Method}
+    C -->|Lexicon| D[Lexicon Analyzer]
+    C -->|ML| E[TF-IDF Featurizer]
+    E --> F[Naive Bayes Classifier]
+    D --> G[Sentiment Score]
+    F --> G
+    G --> H[Sentiment Evaluator]
+    H --> I[Accuracy / Precision / Recall / F1]
 ```
 
-### 🚀 Quick Start
+### Features
 
-#### Prerequisites
+- **Lexicon-based Analysis**: Scoring with negation detection and intensifier handling
+- **Naive Bayes Classifier**: Multinomial NB with Laplace smoothing
+- **TF-IDF Features**: Document vectorization for ML classification
+- **Text Preprocessing**: Tokenization, lowercasing, stop word removal
+- **Evaluation**: Accuracy, per-class precision, recall, and F1
 
-- Python 3.12+
-- pip (Python package manager)
-
-#### Installation
+### Running Tests
 
 ```bash
-# Clone the repository
-git clone https://github.com/galafis/python-nlp-sentiment-analysis.git
-cd python-nlp-sentiment-analysis
-
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+pytest tests/ -v
 ```
 
-#### Running
+### Author
 
-```bash
-# Run the application
-python src/main.py
-```
-
-### 📁 Project Structure
-
-```
-python-nlp-sentiment-analysis/
-├── assets/
-│   └── images/
-├── src/          # Source code
-│   ├── main.py
-│   └── sentiment_analyzer.py
-├── tests/         # Test suite
-│   ├── __init__.py
-│   └── test_main.py
-├── Dockerfile
-├── LICENSE
-├── README.md
-└── requirements.txt
-```
-
-### 🛠️ Tech Stack
-
-| Technology | Description | Role |
-|------------|-------------|------|
-| **Python** | Core Language | Primary |
-| **Docker** | Containerization platform | Framework |
-| **FastAPI** | High-performance async web framework | Framework |
-| **NumPy** | Numerical computing | Framework |
-| **Pandas** | Data manipulation library | Framework |
-| **Plotly** | Interactive visualization | Framework |
-| **scikit-learn** | Machine learning library | Framework |
-| **Streamlit** | Data app framework | Framework |
-
-### 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-### 👤 Author
-
-**Gabriel Demetrios Lafis**
-- GitHub: [@galafis](https://github.com/galafis)
-- LinkedIn: [Gabriel Demetrios Lafis](https://linkedin.com/in/gabriel-demetrios-lafis)
+**Gabriel Demetrios Lafis** - [GitHub](https://github.com/galafis)
 
 ---
 
-## Português
+## Portugues BR
 
-### 🎯 Visão Geral
+### Visao Geral
 
-**Python Nlp Sentiment Analysis** é uma aplicação Python de nível profissional que demonstra práticas modernas de engenharia de software, incluindo arquitetura limpa, testes abrangentes, implantação containerizada e prontidão para CI/CD.
+Um pipeline completo de analise de sentimento implementando analise baseada em lexico (inspirada no VADER), classificacao Naive Bayes, extracao de features TF-IDF, pre-processamento de texto e metricas de avaliacao. Construido do zero em Python.
 
-A base de código compreende **423 linhas** de código-fonte organizadas em **2 módulos**, seguindo as melhores práticas do setor para manutenibilidade, escalabilidade e qualidade de código.
-
-### ✨ Funcionalidades Principais
-
-- **🗣️ Text Processing**: Tokenization, stemming, and lemmatization
-- **📊 Sentiment Analysis**: Multi-language sentiment classification
-- **🔍 Named Entity Recognition**: Entity extraction and classification
-- **📈 Text Analytics**: TF-IDF, word embeddings, and topic modeling
-- **⚡ Async API**: High-performance async REST API with FastAPI
-- **📖 Auto-Documentation**: Interactive Swagger UI and ReDoc
-- **✅ Validation**: Pydantic-powered request/response validation
-- **🐳 Containerized**: Docker support for consistent deployment
-
-### 🏗️ Arquitetura
+### Arquitetura
 
 ```mermaid
-graph TB
-    subgraph Client["🖥️ Client Layer"]
-        A[REST API Client]
-        B[Swagger UI]
-    end
-    
-    subgraph API["⚡ API Layer"]
-        C[Authentication & Rate Limiting]
-        D[Request Validation]
-        E[API Endpoints]
-    end
-    
-    subgraph ML["🤖 ML Engine"]
-        F[Feature Engineering]
-        G[Model Training]
-        H[Prediction Service]
-        I[Model Registry]
-    end
-    
-    subgraph Data["💾 Data Layer"]
-        J[(Database)]
-        K[Cache Layer]
-        L[Data Pipeline]
-    end
-    
-    A --> C
-    B --> C
-    C --> D --> E
-    E --> H
-    E --> J
-    H --> F --> G
-    G --> I
-    I --> H
-    E --> K
-    L --> J
-    
-    style Client fill:#e1f5fe
-    style API fill:#f3e5f5
-    style ML fill:#e8f5e9
-    style Data fill:#fff3e0
+graph TD
+    A[Texto Bruto] --> B[Pre-processador]
+    B --> C{Metodo de Analise}
+    C -->|Lexico| D[Analisador Lexico]
+    C -->|ML| E[TF-IDF]
+    E --> F[Classificador Naive Bayes]
+    D --> G[Score de Sentimento]
+    F --> G
+    G --> H[Avaliador]
+    H --> I[Metricas]
 ```
 
-### 🚀 Início Rápido
+### Funcionalidades
 
-#### Prerequisites
+- **Analise Lexical**: Pontuacao com deteccao de negacao e intensificadores
+- **Naive Bayes**: Classificador multinomial com suavizacao de Laplace
+- **TF-IDF**: Vetorizacao de documentos para classificacao ML
+- **Pre-processamento**: Tokenizacao, remocao de stop words
+- **Avaliacao**: Acuracia, precisao, recall e F1 por classe
 
-- Python 3.12+
-- pip (Python package manager)
+---
 
-#### Installation
+## License
 
-```bash
-# Clone the repository
-git clone https://github.com/galafis/python-nlp-sentiment-analysis.git
-cd python-nlp-sentiment-analysis
-
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-#### Running
-
-```bash
-# Run the application
-python src/main.py
-```
-
-### 📁 Estrutura do Projeto
-
-```
-python-nlp-sentiment-analysis/
-├── assets/
-│   └── images/
-├── src/          # Source code
-│   ├── main.py
-│   └── sentiment_analyzer.py
-├── tests/         # Test suite
-│   ├── __init__.py
-│   └── test_main.py
-├── Dockerfile
-├── LICENSE
-├── README.md
-└── requirements.txt
-```
-
-### 🛠️ Stack Tecnológica
-
-| Tecnologia | Descrição | Papel |
-|------------|-----------|-------|
-| **Python** | Core Language | Primary |
-| **Docker** | Containerization platform | Framework |
-| **FastAPI** | High-performance async web framework | Framework |
-| **NumPy** | Numerical computing | Framework |
-| **Pandas** | Data manipulation library | Framework |
-| **Plotly** | Interactive visualization | Framework |
-| **scikit-learn** | Machine learning library | Framework |
-| **Streamlit** | Data app framework | Framework |
-
-### 🤝 Contribuindo
-
-Contribuições são bem-vindas! Sinta-se à vontade para enviar um Pull Request.
-
-### 📄 Licença
-
-Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
-
-### 👤 Autor
-
-**Gabriel Demetrios Lafis**
-- GitHub: [@galafis](https://github.com/galafis)
-- LinkedIn: [Gabriel Demetrios Lafis](https://linkedin.com/in/gabriel-demetrios-lafis)
+MIT License - see [LICENSE](LICENSE) for details.

@@ -1,281 +1,246 @@
 """
-Core Sentiment Analyzer
-Main class for sentiment analysis using multiple models
+Sentiment Analysis Pipeline
+Lexicon-based and Naive Bayes sentiment analysis with preprocessing and evaluation.
 """
 
-import numpy as np
-import logging
-from typing import List, Dict, Union
-import torch
-from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
+import math
+import re
+from collections import Counter, defaultdict
+from typing import Dict, List, Optional, Tuple
 
-from preprocessing.text_cleaner import TextCleaner
-from models.bert_model import BERTSentimentModel
-from models.traditional_ml import TraditionalMLModel
 
-logger = logging.getLogger(__name__)
+class TextPreprocessor:
+    """Text preprocessing for sentiment analysis."""
 
-class SentimentAnalyzer:
-    def __init__(self, model_type='bert', language='en'):
-        """
-        Initialize sentiment analyzer
-        
-        Args:
-            model_type: Type of model to use ('bert', 'roberta', 'traditional', 'ensemble')
-            language: Language for text processing ('en', 'pt', 'es')
-        """
-        self.model_type = model_type
-        self.language = language
-        self.text_cleaner = TextCleaner(language=language)
-        
-        # Initialize models based on type
-        self._initialize_models()
-        
-        logger.info(f"Sentiment analyzer initialized with model: {model_type}")
-    
-    def _initialize_models(self):
-        """Initialize the specified models"""
-        try:
-            if self.model_type == 'bert':
-                self.model = self._load_bert_model()
-            elif self.model_type == 'roberta':
-                self.model = self._load_roberta_model()
-            elif self.model_type == 'traditional':
-                self.model = TraditionalMLModel()
-            elif self.model_type == 'ensemble':
-                self.models = {
-                    'bert': self._load_bert_model(),
-                    'traditional': TraditionalMLModel()
-                }
-            else:
-                raise ValueError(f"Unknown model type: {self.model_type}")
-                
-        except Exception as e:
-            logger.warning(f"Error loading model {self.model_type}: {str(e)}")
-            logger.info("Falling back to traditional ML model")
-            self.model = TraditionalMLModel()
-            self.model_type = 'traditional'
-    
-    def _load_bert_model(self):
-        """Load BERT model for sentiment analysis"""
-        try:
-            # Try to load fine-tuned model first
-            model_path = "models/trained/bert_sentiment"
-            if torch.cuda.is_available():
-                device = 0
-            else:
-                device = -1
-            
-            # Use Hugging Face pipeline for simplicity
-            return pipeline(
-                "sentiment-analysis",
-                model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-                device=device,
-                return_all_scores=True
-            )
-        except Exception as e:
-            logger.warning(f"Error loading BERT model: {str(e)}")
-            # Fallback to basic sentiment pipeline
-            return pipeline("sentiment-analysis", return_all_scores=True)
-    
-    def _load_roberta_model(self):
-        """Load RoBERTa model for sentiment analysis"""
-        try:
-            return pipeline(
-                "sentiment-analysis",
-                model="cardiffnlp/twitter-roberta-base-sentiment-latest",
-                device=0 if torch.cuda.is_available() else -1,
-                return_all_scores=True
-            )
-        except Exception as e:
-            logger.warning(f"Error loading RoBERTa model: {str(e)}")
-            return self._load_bert_model()
-    
+    STOP_WORDS = frozenset({
+        "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+        "have", "has", "had", "do", "does", "did", "will", "would", "could",
+        "should", "this", "that", "it", "its",
+    })
+
+    def preprocess(self, text: str, remove_stopwords: bool = False) -> List[str]:
+        """Clean and tokenize text."""
+        text = text.lower()
+        text = re.sub(r"[^a-z\s']", " ", text)
+        tokens = text.split()
+        if remove_stopwords:
+            tokens = [t for t in tokens if t not in self.STOP_WORDS]
+        return tokens
+
+
+class LexiconAnalyzer:
+    """VADER-inspired lexicon-based sentiment analyzer."""
+
+    POSITIVE = {
+        "good": 1.5, "great": 2.0, "excellent": 2.5, "amazing": 2.5,
+        "wonderful": 2.5, "fantastic": 2.5, "love": 2.0, "best": 2.0,
+        "happy": 1.5, "beautiful": 1.5, "nice": 1.0, "perfect": 2.5,
+        "awesome": 2.0, "outstanding": 2.5, "brilliant": 2.0, "superb": 2.5,
+        "enjoy": 1.5, "pleased": 1.5, "recommend": 1.5, "like": 1.0,
+        "helpful": 1.5, "easy": 1.0, "fast": 1.0, "reliable": 1.5,
+        "thank": 1.0, "well": 1.0, "better": 1.5, "effective": 1.5,
+        "positive": 1.0, "incredible": 2.0, "delightful": 2.0, "impressive": 2.0,
+    }
+
+    NEGATIVE = {
+        "bad": -1.5, "terrible": -2.5, "horrible": -2.5, "awful": -2.5,
+        "worst": -2.5, "hate": -2.5, "poor": -1.5, "ugly": -1.5,
+        "boring": -1.5, "annoying": -1.5, "disappointing": -2.0,
+        "useless": -2.0, "broken": -1.5, "slow": -1.0, "difficult": -1.0,
+        "problem": -1.5, "error": -1.5, "fail": -2.0, "failure": -2.0,
+        "wrong": -1.5, "waste": -2.0, "never": -1.0, "unhappy": -1.5,
+        "angry": -2.0, "frustrated": -2.0, "confusing": -1.5,
+        "complicated": -1.0, "crash": -2.0, "bug": -1.5,
+    }
+
+    NEGATIONS = {"not", "no", "never", "neither", "nor", "don't", "doesn't",
+                 "didn't", "won't", "wouldn't", "couldn't", "shouldn't",
+                 "isn't", "aren't", "wasn't", "hardly", "barely", "scarcely"}
+
+    INTENSIFIERS = {"very": 1.3, "really": 1.3, "extremely": 1.5,
+                    "absolutely": 1.5, "totally": 1.4, "incredibly": 1.4,
+                    "highly": 1.3, "so": 1.2, "quite": 1.1}
+
+    def __init__(self):
+        self.preprocessor = TextPreprocessor()
+
     def analyze(self, text: str) -> Dict:
-        """
-        Analyze sentiment of a single text
-        
-        Args:
-            text: Input text to analyze
-            
-        Returns:
-            Dictionary with sentiment, confidence, and probabilities
-        """
-        if not text or not text.strip():
-            return {
-                'sentiment': 'neutral',
-                'confidence': 0.0,
-                'probabilities': {'positive': 0.33, 'negative': 0.33, 'neutral': 0.34}
-            }
-        
-        # Preprocess text
-        cleaned_text = self.text_cleaner.preprocess_pipeline(text)
-        
-        if self.model_type == 'ensemble':
-            return self._analyze_ensemble(cleaned_text)
-        else:
-            return self._analyze_single_model(cleaned_text)
-    
-    def _analyze_single_model(self, text: str) -> Dict:
-        """Analyze using single model"""
-        try:
-            if self.model_type in ['bert', 'roberta']:
-                return self._analyze_transformer(text)
-            elif self.model_type == 'traditional':
-                return self._analyze_traditional(text)
-        except Exception as e:
-            logger.error(f"Error in sentiment analysis: {str(e)}")
-            return {
-                'sentiment': 'neutral',
-                'confidence': 0.0,
-                'probabilities': {'positive': 0.33, 'negative': 0.33, 'neutral': 0.34}
-            }
-    
-    def _analyze_transformer(self, text: str) -> Dict:
-        """Analyze using transformer model"""
-        try:
-            # Get predictions
-            results = self.model(text)
-            
-            # Process results
-            if isinstance(results[0], list):
-                scores = results[0]
-            else:
-                scores = results
-            
-            # Convert to standard format
-            probabilities = {}
-            max_score = 0
-            predicted_sentiment = 'neutral'
-            
-            for score in scores:
-                label = score['label'].lower()
-                prob = score['score']
-                
-                # Map labels to standard format
-                if 'pos' in label or label == 'label_2':
-                    probabilities['positive'] = prob
-                    if prob > max_score:
-                        max_score = prob
-                        predicted_sentiment = 'positive'
-                elif 'neg' in label or label == 'label_0':
-                    probabilities['negative'] = prob
-                    if prob > max_score:
-                        max_score = prob
-                        predicted_sentiment = 'negative'
-                else:  # neutral or label_1
-                    probabilities['neutral'] = prob
-                    if prob > max_score:
-                        max_score = prob
-                        predicted_sentiment = 'neutral'
-            
-            # Ensure all probabilities are present
-            for sentiment in ['positive', 'negative', 'neutral']:
-                if sentiment not in probabilities:
-                    probabilities[sentiment] = 0.0
-            
-            return {
-                'sentiment': predicted_sentiment,
-                'confidence': max_score,
-                'probabilities': probabilities
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in transformer analysis: {str(e)}")
-            return self._get_default_result()
-    
-    def _analyze_traditional(self, text: str) -> Dict:
-        """Analyze using traditional ML model"""
-        try:
-            return self.model.predict(text)
-        except Exception as e:
-            logger.error(f"Error in traditional ML analysis: {str(e)}")
-            return self._get_default_result()
-    
-    def _analyze_ensemble(self, text: str) -> Dict:
-        """Analyze using ensemble of models"""
-        try:
-            results = []
-            
-            # Get predictions from all models
-            for model_name, model in self.models.items():
-                if model_name in ['bert', 'roberta']:
-                    result = self._analyze_transformer(text)
-                else:
-                    result = model.predict(text)
-                results.append(result)
-            
-            # Ensemble predictions (simple averaging)
-            ensemble_probs = {'positive': 0, 'negative': 0, 'neutral': 0}
-            
-            for result in results:
-                for sentiment, prob in result['probabilities'].items():
-                    ensemble_probs[sentiment] += prob
-            
-            # Average probabilities
-            num_models = len(results)
-            for sentiment in ensemble_probs:
-                ensemble_probs[sentiment] /= num_models
-            
-            # Get final prediction
-            predicted_sentiment = max(ensemble_probs, key=ensemble_probs.get)
-            confidence = ensemble_probs[predicted_sentiment]
-            
-            return {
-                'sentiment': predicted_sentiment,
-                'confidence': confidence,
-                'probabilities': ensemble_probs
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in ensemble analysis: {str(e)}")
-            return self._get_default_result()
-    
-    def analyze_batch(self, texts: List[str], batch_size: int = 32) -> List[Dict]:
-        """
-        Analyze sentiment of multiple texts
-        
-        Args:
-            texts: List of texts to analyze
-            batch_size: Batch size for processing
-            
-        Returns:
-            List of sentiment analysis results
-        """
-        results = []
-        
-        logger.info(f"Analyzing {len(texts)} texts in batches of {batch_size}")
-        
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            batch_results = []
-            
-            for text in batch:
-                result = self.analyze(text)
-                batch_results.append(result)
-            
-            results.extend(batch_results)
-            
-            if i + batch_size < len(texts):
-                logger.info(f"Processed {i + batch_size}/{len(texts)} texts")
-        
-        logger.info(f"Completed analysis of {len(texts)} texts")
-        return results
-    
-    def _get_default_result(self) -> Dict:
-        """Get default result for error cases"""
+        """Analyze sentiment using lexicon scoring."""
+        tokens = self.preprocessor.preprocess(text)
+        if not tokens:
+            return {"sentiment": "neutral", "compound": 0.0,
+                    "positive": 0.0, "negative": 0.0, "neutral": 1.0}
+
+        scores = []
+        for i, token in enumerate(tokens):
+            score = self.POSITIVE.get(token, 0) + self.NEGATIVE.get(token, 0)
+            if score != 0:
+                if i > 0 and tokens[i - 1] in self.NEGATIONS:
+                    score *= -0.75
+                if i > 0 and tokens[i - 1] in self.INTENSIFIERS:
+                    score *= self.INTENSIFIERS[tokens[i - 1]]
+            scores.append(score)
+
+        pos_sum = sum(s for s in scores if s > 0)
+        neg_sum = sum(s for s in scores if s < 0)
+        total = pos_sum + abs(neg_sum)
+        compound = (pos_sum + neg_sum) / (total + 5.0) if total > 0 else 0.0
+        compound = max(-1.0, min(1.0, compound))
+
+        n = len(scores) if scores else 1
+        pos_prop = sum(1 for s in scores if s > 0) / n
+        neg_prop = sum(1 for s in scores if s < 0) / n
+
+        label = "positive" if compound >= 0.05 else "negative" if compound <= -0.05 else "neutral"
+
         return {
-            'sentiment': 'neutral',
-            'confidence': 0.0,
-            'probabilities': {'positive': 0.33, 'negative': 0.33, 'neutral': 0.34}
-        }
-    
-    def get_model_info(self) -> Dict:
-        """Get information about the current model"""
-        return {
-            'model_type': self.model_type,
-            'language': self.language,
-            'supports_batch': True,
-            'supports_probabilities': True
+            "sentiment": label,
+            "compound": round(compound, 4),
+            "positive": round(pos_prop, 4),
+            "negative": round(neg_prop, 4),
+            "neutral": round(1 - pos_prop - neg_prop, 4),
         }
 
+
+class NaiveBayesSentiment:
+    """Naive Bayes classifier for sentiment analysis."""
+
+    def __init__(self, alpha: float = 1.0):
+        self.alpha = alpha
+        self.class_log_priors = {}
+        self.feature_log_probs = {}
+        self.vocabulary = set()
+        self.classes = []
+        self.preprocessor = TextPreprocessor()
+        self._fitted = False
+
+    def fit(self, texts: List[str], labels: List[str]) -> "NaiveBayesSentiment":
+        """Train on labeled text data."""
+        class_counts = Counter(labels)
+        self.classes = sorted(class_counts.keys())
+        total = len(texts)
+
+        self.class_log_priors = {
+            c: math.log(n / total) for c, n in class_counts.items()
+        }
+
+        tokenized = [self.preprocessor.preprocess(t, remove_stopwords=True) for t in texts]
+        self.vocabulary = set()
+        for tokens in tokenized:
+            self.vocabulary.update(tokens)
+
+        vocab_size = len(self.vocabulary)
+        class_word_counts = defaultdict(Counter)
+        class_total = defaultdict(int)
+
+        for tokens, label in zip(tokenized, labels):
+            for token in tokens:
+                class_word_counts[label][token] += 1
+                class_total[label] += 1
+
+        self.feature_log_probs = {}
+        for cls in self.classes:
+            self.feature_log_probs[cls] = {}
+            for word in self.vocabulary:
+                count = class_word_counts[cls][word]
+                self.feature_log_probs[cls][word] = math.log(
+                    (count + self.alpha) / (class_total[cls] + self.alpha * vocab_size)
+                )
+
+        self._fitted = True
+        return self
+
+    def predict(self, text: str) -> str:
+        """Predict sentiment label."""
+        probs = self.predict_proba(text)
+        return max(probs, key=probs.get)
+
+    def predict_proba(self, text: str) -> Dict[str, float]:
+        """Predict class probabilities."""
+        if not self._fitted:
+            raise RuntimeError("Model must be fitted before prediction.")
+
+        tokens = self.preprocessor.preprocess(text, remove_stopwords=True)
+        log_probs = {}
+
+        for cls in self.classes:
+            lp = self.class_log_priors[cls]
+            for token in tokens:
+                if token in self.feature_log_probs[cls]:
+                    lp += self.feature_log_probs[cls][token]
+            log_probs[cls] = lp
+
+        max_lp = max(log_probs.values())
+        exp_sum = sum(math.exp(v - max_lp) for v in log_probs.values())
+        return {c: math.exp(v - max_lp) / exp_sum for c, v in log_probs.items()}
+
+
+class TfidfFeaturizer:
+    """TF-IDF feature extraction for sentiment analysis."""
+
+    def __init__(self):
+        self.vocabulary = {}
+        self.idf = {}
+        self.preprocessor = TextPreprocessor()
+
+    def fit_transform(self, texts: List[str]) -> List[List[float]]:
+        """Fit on texts and return TF-IDF vectors."""
+        tokenized = [self.preprocessor.preprocess(t, remove_stopwords=True) for t in texts]
+        n_docs = len(texts)
+
+        df = Counter()
+        for tokens in tokenized:
+            for token in set(tokens):
+                df[token] += 1
+
+        sorted_terms = sorted(df.items(), key=lambda x: x[1], reverse=True)
+        self.vocabulary = {term: idx for idx, (term, _) in enumerate(sorted_terms)}
+        self.idf = {term: math.log((n_docs + 1) / (freq + 1)) + 1
+                    for term, freq in sorted_terms}
+
+        return self._transform(tokenized)
+
+    def transform(self, texts: List[str]) -> List[List[float]]:
+        """Transform texts using fitted vocabulary."""
+        tokenized = [self.preprocessor.preprocess(t, remove_stopwords=True) for t in texts]
+        return self._transform(tokenized)
+
+    def _transform(self, tokenized: List[List[str]]) -> List[List[float]]:
+        vectors = []
+        for tokens in tokenized:
+            vec = [0.0] * len(self.vocabulary)
+            tf = Counter(tokens)
+            total = len(tokens) if tokens else 1
+            for term, idx in self.vocabulary.items():
+                if term in tf:
+                    vec[idx] = (tf[term] / total) * self.idf.get(term, 0)
+            vectors.append(vec)
+        return vectors
+
+
+class SentimentEvaluator:
+    """Evaluation metrics for sentiment analysis."""
+
+    @staticmethod
+    def accuracy(y_true: List[str], y_pred: List[str]) -> float:
+        correct = sum(1 for t, p in zip(y_true, y_pred) if t == p)
+        return correct / len(y_true) if y_true else 0.0
+
+    @staticmethod
+    def precision_recall_f1(y_true: List[str], y_pred: List[str]) -> Dict:
+        classes = sorted(set(y_true + y_pred))
+        metrics = {}
+
+        for cls in classes:
+            tp = sum(1 for t, p in zip(y_true, y_pred) if t == cls and p == cls)
+            fp = sum(1 for t, p in zip(y_true, y_pred) if t != cls and p == cls)
+            fn = sum(1 for t, p in zip(y_true, y_pred) if t == cls and p != cls)
+
+            prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            f1 = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+
+            metrics[cls] = {"precision": round(prec, 4), "recall": round(rec, 4), "f1": round(f1, 4)}
+
+        return metrics
